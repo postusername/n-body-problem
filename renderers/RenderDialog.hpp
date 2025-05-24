@@ -186,27 +186,31 @@ void RenderDialog::on_dt_changed() {
 }
 
 void RenderDialog::on_browse_clicked() {
-    auto dialog = Gtk::FileChooserDialog(*this, "Выберите папку для сохранения",
-                                         Gtk::FileChooser::Action::SELECT_FOLDER);
-    dialog.add_button("Отмена", Gtk::ResponseType::CANCEL);
-    dialog.add_button("Выбрать", Gtk::ResponseType::OK);
+    auto dialog = Gtk::FileChooserNative::create("Выберите папку для сохранения",
+                                                  *this,
+                                                  Gtk::FileChooser::Action::SELECT_FOLDER,
+                                                  "Выбрать",
+                                                  "Отмена");
     
-    if (!settings_.output_path.empty()) {
-        dialog.set_current_folder(Gio::File::create_for_path(settings_.output_path));
+    if (!settings_.output_path.empty() && std::filesystem::exists(settings_.output_path)) {
+        try {
+            dialog->set_current_folder(Gio::File::create_for_path(settings_.output_path));
+        } catch (...) {
+
+        }
     }
     
-    dialog.signal_response().connect([this, &dialog](int response_id) {
-        if (response_id == Gtk::ResponseType::OK) {
-            auto file = dialog.get_file();
+    dialog->signal_response().connect([this, dialog](int response) {
+        if (response == Gtk::ResponseType::OK) {
+            auto file = dialog->get_file();
             if (file) {
                 settings_.output_path = file->get_path();
                 path_entry_->set_text(settings_.output_path);
             }
         }
-        dialog.hide();
     });
     
-    dialog.show();
+    dialog->show();
 }
 
 void RenderDialog::on_estimate_clicked() {
