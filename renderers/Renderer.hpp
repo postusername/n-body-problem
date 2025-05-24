@@ -1,5 +1,6 @@
 #pragma once
 
+#include "simulators/Simulator.hpp"
 #include "systems/System.hpp"
 
 
@@ -9,11 +10,11 @@ namespace nbody {
 template <typename T>
 class Renderer {
 public:
-    Renderer() = default;
+    Renderer() {}
     virtual ~Renderer() = default;
     
     // Инициализация рендерера
-    virtual bool initialize() = 0;
+    virtual bool initialize(Simulator<T>* simulator) = 0;
     
     // Отрисовка системы
     virtual void render(const System<T>& system) = 0;
@@ -111,6 +112,8 @@ protected:
     T rotation_x_ = T{0};   // Угол поворота по оси X
     T rotation_y_ = T{0};   // Угол поворота по оси Y
     T rotation_z_ = T{0};   // Угол поворота по оси Z
+
+    Simulator<T>* simulator_ = nullptr;
 };
 
 } // namespace nbody 

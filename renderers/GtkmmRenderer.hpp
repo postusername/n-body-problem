@@ -14,6 +14,7 @@
 #include "renderers/GraphWidget.hpp"
 #include "renderers/RenderDialog.hpp"
 #include "renderers/Renderer.hpp"
+#include "simulators/Simulator.hpp"
 
 #include <gtkmm.h>
 
@@ -345,7 +346,9 @@ public:
         this->rotation_z_ = T{0.0};
     }
     
-    bool initialize() override {
+    bool initialize(Simulator<T>* simulator) override {
+        this->simulator_ = simulator;
+        
         m_drawing_area = std::make_unique<NBodyDrawingArea<T>>();
         m_drawing_area->set_size_request(1024, 700);
         m_drawing_area->set_expand(true);
@@ -542,26 +545,17 @@ public:
         
         auto system = m_drawing_area->get_system();
         auto renderer = m_drawing_area->get_renderer();
-        
-        if (!system || !renderer) {
-            // Если нет данных системы, используем примерное время
-            if (m_render_dialog) {
-                m_render_dialog->update_eta_from_measurement(0.1);
-            }
-            return;
-        }
-        
+    
         auto start_time = std::chrono::high_resolution_clock::now();
         
-        // Рендерим все режимы которые будут сохраняться
         int render_count = 0;
-        
         if (settings.save_main) {
+            this->simulator_->step();
             auto surface = Cairo::ImageSurface::create(Cairo::Surface::Format::ARGB32, width, height);
             auto cr = Cairo::Context::create(surface);
             
-            auto& cairo_renderer = m_drawing_area->get_cairo_renderer();
-            auto temp_cairo = cairo_renderer;
+            CairoRenderer<T>& cairo_renderer = m_drawing_area->get_cairo_renderer();
+            CairoRenderer<T> temp_cairo = cairo_renderer;
             temp_cairo.set_depth_mode(false);
             temp_cairo.render(cr, *system, *renderer, width, height, false);
             render_count++;
@@ -571,23 +565,21 @@ public:
             auto surface = Cairo::ImageSurface::create(Cairo::Surface::Format::ARGB32, width, height);
             auto cr = Cairo::Context::create(surface);
             
-            auto& cairo_renderer = m_drawing_area->get_cairo_renderer();
-            auto temp_cairo = cairo_renderer;
+            CairoRenderer<T>& cairo_renderer = m_drawing_area->get_cairo_renderer();
+            CairoRenderer<T> temp_cairo = cairo_renderer;
             temp_cairo.set_depth_mode(true);
             temp_cairo.render(cr, *system, *renderer, width, height, false);
             render_count++;
         }
         
         if (settings.save_energy) {
-            // Симулируем рендер графика энергии
             std::vector<T> dummy_history = {T{-1.0}, T{-1.1}, T{-0.9}};
             
             auto surface = Cairo::ImageSurface::create(Cairo::Surface::Format::ARGB32, width, height);
             auto cr = Cairo::Context::create(surface);
             cr->set_source_rgb(0.0, 0.0, 0.0);
             cr->paint();
-            
-            // Простой рендер линии для симуляции графика
+
             cr->set_source_rgb(0.0, 1.0, 0.0);
             cr->set_line_width(2.0);
             cr->move_to(50, height/2);
@@ -598,20 +590,19 @@ public:
         
         auto end_time = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
-        double total_time = duration.count() / 1000000.0;  // Конвертируем в секунды
+        double total_time = duration.count() / 1000000.0;
+
+        double time_per_step = render_count > 0 ? total_time : 0.1;
+        time_per_step = std::max(0.001, time_per_step);
+
+        const int video_fps = 60;
+        const double time_per_frame = 1.0 / video_fps;
+        const int steps_per_frame = std::max(1, static_cast<int>(time_per_frame / settings.dt));
+        double seconds_per_frame = time_per_step * steps_per_frame;
         
-        // Время на один кадр = общее время / количество рендеров
-        double time_per_frame = render_count > 0 ? total_time / render_count : 0.1;
-        
-        // Добавляем время для энкодирования видео (примерно 15% от времени рендера)
-        time_per_frame *= 1.15;
-        
-        // Минимальное время - 0.001 секунды на кадр
-        time_per_frame = std::max(0.001, time_per_frame);
-        
-        // Обновляем диалог с измеренным временем
+        // Почему-то стабильно недооцениваем в два раза
         if (m_render_dialog) {
-            m_render_dialog->update_eta_from_measurement(time_per_frame);
+            m_render_dialog->update_eta_from_measurement(seconds_per_frame * 2.);
         }
     }
 

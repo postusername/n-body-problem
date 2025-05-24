@@ -46,7 +46,7 @@ public:
             
             simulator.set_system(&system);
             
-            if (!renderer.initialize()) {
+            if (!renderer.initialize(&simulator)) {
                 std::cerr << "ERROR: Не удалось инициализировать рендерер" << std::endl;
                 return 1;
             }
@@ -249,7 +249,7 @@ private:
     std::thread simulation_thread;
     double cli_dt_value;
     
-    nbody::ThreeBodySystem<DoubleDouble> system;
+    nbody::SolarSystem<DoubleDouble> system;
     nbody::NewtonianSimulator<DoubleDouble> simulator;
     nbody::GtkmmRenderer<DoubleDouble> renderer;
 };

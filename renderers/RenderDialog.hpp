@@ -235,7 +235,7 @@ void RenderDialog::on_save_options_changed() {
 }
 
 void RenderDialog::update_frame_info() {
-    int frame_count = std::max(1, static_cast<int>(settings_.duration / settings_.dt));
+    int frame_count = std::max(1, static_cast<int>(settings_.duration * 60));
     int current_modes = count_active_modes();
     
     double time_per_frame;

@@ -23,7 +23,7 @@ namespace nbody {
 template<typename T>
 class RenderEngine {
 public:
-    RenderEngine(const RenderSettings& settings, int width, int height);
+    RenderEngine(const RenderSettings& settings, int width, int height, int video_fps = 60);
     
     template<typename SystemType, typename SimulatorType, typename RendererType>
     bool execute(SystemType& system, SimulatorType& simulator, RendererType& renderer);
@@ -52,10 +52,11 @@ private:
 };
 
 template<typename T>
-RenderEngine<T>::RenderEngine(const RenderSettings& settings, int width, int height)
+RenderEngine<T>::RenderEngine(const RenderSettings& settings, int width, int height, int video_fps)
     : settings_(settings), width_(width), height_(height) {
 
-    total_frames_ = std::max(1, static_cast<int>(settings_.duration / settings_.dt));
+
+    total_frames_ = std::max(1, static_cast<int>(settings_.duration * video_fps));
 
     main_cairo_renderer_.set_depth_mode(false);
     depth_cairo_renderer_.set_depth_mode(true);
@@ -79,7 +80,7 @@ bool RenderEngine<T>::execute(SystemType& system, SimulatorType& simulator, Rend
     std::cout << "Начало рендера..." << std::endl;
     std::cout << "Длительность: " << settings_.duration << " сек" << std::endl;
     std::cout << "Временной шаг: " << settings_.dt << std::endl;
-    std::cout << "Кадров: " << total_frames_ << std::endl;
+    std::cout << "Кадров видео: " << total_frames_ << " (60 fps)" << std::endl;
     std::cout << "Разрешение: " << width_ << "x" << height_ << std::endl;
     std::cout << "Выходная папка: " << settings_.output_path << std::endl;
     std::cout << std::endl;
@@ -124,16 +125,25 @@ bool RenderEngine<T>::execute(SystemType& system, SimulatorType& simulator, Rend
 
     simulator.set_dt(settings_.dt);
     auto start_time = std::chrono::steady_clock::now();
+
+    const int video_fps = 60;
+    const double time_per_frame = 1.0 / video_fps;
+    const int steps_per_frame = std::max(1, static_cast<int>(time_per_frame / settings_.dt));
+    
+    std::cout << "Шагов симуляции на кадр: " << steps_per_frame << std::endl;
+    std::cout << "Всего шагов симуляции: " << total_frames_ * steps_per_frame << std::endl;
     
     for (int frame = 0; frame < total_frames_; ++frame) {
-        if (!simulator.step()) {
-            std::cerr << "ERROR: Ошибка в шаге симуляции на кадре " << frame << std::endl;
-            return false;
-        }
+        for (int step = 0; step < steps_per_frame; ++step) {
+            if (!simulator.step()) {
+                std::cerr << "ERROR: Ошибка в шаге симуляции на кадре " << frame << ", шаге " << step << std::endl;
+                return false;
+            }
 
-        if (!system.is_valid()) {
-            std::cerr << "ERROR: Система стала некорректной на кадре " << frame << std::endl;
-            return false;
+            if (!system.is_valid()) {
+                std::cerr << "ERROR: Система стала некорректной на кадре " << frame << ", шаге " << step << std::endl;
+                return false;
+            }
         }
 
         if (settings_.save_energy) {
