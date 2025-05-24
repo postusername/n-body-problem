@@ -388,6 +388,11 @@ public:
         spacer->set_hexpand(true);
         m_control_box->append(*spacer);
         
+        m_loading_label = std::make_unique<Gtk::Label>("Генерация первого кадра...");
+        m_loading_label->set_margin_start(10);
+        m_loading_label->set_margin_end(10);
+        m_control_box->append(*m_loading_label);
+        
         m_render_button = std::make_unique<Gtk::Button>("Рендер");
         m_render_button->signal_clicked().connect(
             sigc::mem_fun(*this, &GtkmmRenderer::on_render_clicked));
@@ -407,6 +412,11 @@ public:
         
         if (m_graph_widget) {
             m_graph_widget->add_point(system.graph_value());
+        }
+
+        if (!m_first_frame_rendered && m_loading_label) {
+            m_loading_label->set_visible(false);
+            m_first_frame_rendered = true;
         }
     }
     
@@ -620,6 +630,9 @@ private:
     std::unique_ptr<Gtk::Label> m_trail_length_label;
     std::unique_ptr<Gtk::Scale> m_trail_length_scale;
     std::unique_ptr<Gtk::Button> m_render_button;
+
+    std::unique_ptr<Gtk::Label> m_loading_label;
+    bool m_first_frame_rendered = false;
     
     // Флаг, указывающий на необходимость завершения
     std::atomic<bool> m_should_close;
