@@ -1,12 +1,15 @@
 #pragma once
 
-#include "systems/System.hpp"
 #include <functional>
 #include <stdexcept>
 
+#include "systems/System.hpp"
+
+
+
 namespace nbody {
 
-template <typename T, typename = std::enable_if_t<std::is_floating_point_v<T>>>
+template <typename T>
 class Simulator {
 public:
     using StepCallback = std::function<void(const System<T>&, T)>;
@@ -23,6 +26,14 @@ public:
             throw std::invalid_argument("Time step must be positive");
         }
         dt_ = dt;
+    }
+
+    T dt() const {
+        return dt_;
+    }
+
+    int steps_per_frame() const {
+        return static_cast<int>(T{1e-2} / dt_);
     }
 
     void set_step_callback(StepCallback callback) {

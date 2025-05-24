@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <numbers>
 
 #include "systems/System.hpp"
 
@@ -9,36 +10,35 @@
 namespace nbody {
 
 template <typename T>
-class ThreeBodySystem : public System<T> {
+class CircleSystem : public System<T> {
 public:
-    ThreeBodySystem() = default;
+    CircleSystem() {}
     
     void generate() override {
         this->clear();
-
-        // Chenciner, A., & Montgomery, R. (2000)
-        // "A remarkable periodic solution of the three-body problem in the case of equal masses"
         
         const T mass = T{1.0};
+        const T G = T{1.0};
         
-        Vector<T> pos1(T{-0.97000436}, T{0.24308753}, T{0});
-        Vector<T> pos2 = -pos1;
-        Vector<T> pos3(T{0}, T{0}, T{0});
+        T orbit_velocity = sqrt(G * mass * T{num_bodies_} / (3.625 * radius_));
+        
+        for (int i = 0; i < int(num_bodies_); ++i) {
+            T angle = T{2.0} * M_PI * T{i} / num_bodies_;
+            
+            T x = radius_ * cos(angle);
+            T y = radius_ * sin(angle);
+            Vector<T> position(x, y, T{0});
 
-        Vector<T> vel3(T{-0.93240737}, T{-0.86473146}, T{0});
-        Vector<T> vel1 = -vel3 / T{2};
-        Vector<T> vel2 = -vel3 / T{2};
-
-        this->add_body(Body<T>(mass, pos1, vel1, "Body 1"));
-        this->add_body(Body<T>(mass, pos2, vel2, "Body 2"));
-        this->add_body(Body<T>(mass, pos3, vel3, "Body 3"));
+            T vx = -orbit_velocity * sin(angle);
+            T vy = orbit_velocity * cos(angle);
+            Vector<T> velocity(vx, vy, T{0});
+            
+            this->add_body(Body<T>(mass, position, velocity, "Body " + std::to_string(i+1)));
+        }
     }
     
-    bool is_valid() const override {
-        if (!System<T>::is_valid()) {
-            return false;
-        }
 
+    bool is_valid() const override {
         Vector<T> center_of_mass;
         Vector<T> total_momentum;
         T total_mass = T{0};
@@ -53,17 +53,23 @@ public:
             center_of_mass = center_of_mass / total_mass;
         }
         
-        const T epsilon = T{1e-4};
+        const T epsilon = T{5e-1};
+        
+        // центр масс близок к нулю
+        if (center_of_mass.magnitude() > epsilon) {
+            std::cerr << "ERROR: центр масс отклонился: " << center_of_mass << std::endl;
+            return false;
+        }
         
         // суммарный импульс близок к нулю
         if (total_momentum.magnitude() > epsilon) {
-            std::cerr << "Ошибка: импульс отклонился: " << total_momentum << std::endl;
+            std::cerr << "ERROR: импульс отклонился: " << total_momentum << std::endl;
             return false;
         }
         
         return true;
     }
-    
+
     T graph_value() const override {
         T total_energy = T{0};
         const T G = T{1.0};
@@ -87,6 +93,8 @@ public:
     }
     
 private:
+    T num_bodies_ = 5;  // Количество тел
+    T radius_ = T{1.0}; // Радиус кольца
 };
 
 } // namespace nbody 

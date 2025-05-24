@@ -6,9 +6,13 @@
 #include <limits>
 #include <type_traits>
 
+#include "core/DoubleDouble.h"
+
+
+
 namespace nbody {
 
-template <typename T, typename = std::enable_if_t<std::is_floating_point_v<T>>>
+template <typename T>
 class Vector {
 public:
     static constexpr std::size_t dimensions = 3;
@@ -65,7 +69,7 @@ public:
     }
     
     T magnitude() const {
-        return std::sqrt(magnitude_squared());
+        return sqrt(magnitude_squared());
     }
     
     Vector normalized() const {
@@ -76,44 +80,51 @@ public:
         return *this / mag;
     }
     
+    Vector operator-() const {
+        Vector result;
+        for (std::size_t i = 0; i < dimensions; ++i) {
+            result.data_[i] = -data_[i];
+        }
+        return result;
+    }
 private:
     std::array<T, dimensions> data_;
 };
 
-template <typename T, typename = std::enable_if_t<std::is_floating_point_v<T>>>
+template <typename T>
 Vector<T> operator+(const Vector<T>& lhs, const Vector<T>& rhs) {
     Vector<T> result = lhs;
     result += rhs;
     return result;
 }
 
-template <typename T, typename = std::enable_if_t<std::is_floating_point_v<T>>>
+template <typename T>
 Vector<T> operator-(const Vector<T>& lhs, const Vector<T>& rhs) {
     Vector<T> result = lhs;
     result -= rhs;
     return result;
 }
 
-template <typename T, typename = std::enable_if_t<std::is_floating_point_v<T>>>
+template <typename T>
 Vector<T> operator*(const Vector<T>& vec, T scalar) {
     Vector<T> result = vec;
     result *= scalar;
     return result;
 }
 
-template <typename T, typename = std::enable_if_t<std::is_floating_point_v<T>>>
+template <typename T>
 Vector<T> operator*(T scalar, const Vector<T>& vec) {
     return vec * scalar;
 }
 
-template <typename T, typename = std::enable_if_t<std::is_floating_point_v<T>>>
+template <typename T>
 Vector<T> operator/(const Vector<T>& vec, T scalar) {
     Vector<T> result = vec;
     result /= scalar;
     return result;
 }
 
-template <typename T, typename = std::enable_if_t<std::is_floating_point_v<T>>>
+template <typename T>
 T dot(const Vector<T>& lhs, const Vector<T>& rhs) {
     T result{};
     for (std::size_t i = 0; i < Vector<T>::dimensions; ++i) {
@@ -122,7 +133,7 @@ T dot(const Vector<T>& lhs, const Vector<T>& rhs) {
     return result;
 }
 
-template <typename T, typename = std::enable_if_t<std::is_floating_point_v<T>>>
+template <typename T>
 Vector<T> cross(const Vector<T>& lhs, const Vector<T>& rhs) {
     return Vector<T>(
         lhs.y() * rhs.z() - lhs.z() * rhs.y(),
@@ -131,7 +142,7 @@ Vector<T> cross(const Vector<T>& lhs, const Vector<T>& rhs) {
     );
 }
 
-template <typename T, typename = std::enable_if_t<std::is_floating_point_v<T>>>
+template <typename T>
 std::ostream& operator<<(std::ostream& os, const Vector<T>& vec) {
     os << "(" << vec.x() << ", " << vec.y() << ", " << vec.z() << ")";
     return os;

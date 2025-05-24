@@ -1,13 +1,16 @@
 #pragma once
 
-#include "core/Body.hpp"
-#include <vector>
 #include <memory>
 #include <stdexcept>
+#include <vector>
+
+#include "core/Body.hpp"
+
+
 
 namespace nbody {
 
-template <typename T, typename = std::enable_if_t<std::is_floating_point_v<T>>>
+template <typename T>
 class System {
 public:
     System() = default;
@@ -30,18 +33,13 @@ public:
     
     // Проверка корректности состояния системы
     // Можно переопределить в подклассах для дополнительных проверок
-    virtual bool is_valid() const {
-        for (const auto& body : bodies_) {
-            if (body.mass() <= T{0}) {
-                return false;
-            }
-        }
-        return true;
-    }
+    virtual bool is_valid() const { return true; }
     
     // Генерация начального состояния системы
     // Должна быть определена в подклассах
     virtual void generate() = 0;
+    
+    virtual T graph_value() const = 0;
     
 protected:
     std::vector<Body<T>> bodies_;

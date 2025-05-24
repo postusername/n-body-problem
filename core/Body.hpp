@@ -1,11 +1,14 @@
 #pragma once
 
-#include "core/Vector.hpp"
 #include <string>
+
+#include "core/Vector.hpp"
+
+
 
 namespace nbody {
 
-template <typename T, typename = std::enable_if_t<std::is_floating_point_v<T>>>
+template <typename T>
 class Body {
 public:
     Body() = default;

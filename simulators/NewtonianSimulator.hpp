@@ -1,10 +1,13 @@
 #pragma once
 
 #include "simulators/Simulator.hpp"
+#include "systems/TwoBodySystem.hpp"
+
+
 
 namespace nbody {
 
-template <typename T, typename = std::enable_if_t<std::is_floating_point_v<T>>>
+template <typename T>
 class NewtonianSimulator : public Simulator<T> {
 public:
     NewtonianSimulator() = default;
@@ -18,11 +21,11 @@ public:
         T distance_squared = r.magnitude_squared();
         
         // Избегаем деления на ноль
-        if (distance_squared < T{1e-15}) {
+        if (distance_squared < T{1e-20}) {
             return Vector<T>{};
         }
         
-        // Сила F = G * m1 * m2 / r^2 * (r_vec / |r|)
+        // F = G * m1 * m2 / r^2
         T force_magnitude = g_ * body1.mass() * body2.mass() / distance_squared;
         return r.normalized() * force_magnitude;
     }
@@ -33,28 +36,32 @@ public:
         }
         
         auto& bodies = this->system_->bodies();
-        std::vector<Vector<T>> accelerations = calculate_accelerations(bodies);
+        std::vector<Vector<T>> current_accelerations = calculate_accelerations(bodies);
+        
+        // v(t + dt/2) = v(t) + a(t)*dt/2
+        for (std::size_t i = 0; i < bodies.size(); ++i) {
+            Body<T>& body = bodies[i];
+            body.set_velocity(body.velocity() + current_accelerations[i] * (this->dt_ * T{0.5}));
+        }
 
-        std::vector<Vector<T>> old_positions;
-        old_positions.reserve(bodies.size());
-        for (const auto& body : bodies) {
-            old_positions.push_back(body.position());
-        }
-        
-        // x(t+dt) = x(t) + v(t)*dt + 0.5*a(t)*dt²
+        // x(t + dt) = x(t) + v(t + dt/2) * dt
         for (std::size_t i = 0; i < bodies.size(); ++i) {
             Body<T>& body = bodies[i];
-            
-            Vector<T> half_step_velocity = body.velocity() + accelerations[i] * (this->dt_ * T{0.5});
-            body.set_position(body.position() + half_step_velocity * this->dt_);
+            body.set_position(body.position() + body.velocity() * this->dt_);
         }
         
-        // v(t+dt) = v(t) + 0.5*[a(t) + a(t+dt)]*dt
-        std::vector<Vector<T>> new_accelerations = calculate_accelerations(bodies);
+        // a(t + dt) на основе новых позиций x(t + dt)
+        std::vector<Vector<T>> next_accelerations = calculate_accelerations(bodies);
+        
+        // v(t + dt) = v(t + dt/2) + a(t + dt)*dt/2
         for (std::size_t i = 0; i < bodies.size(); ++i) {
             Body<T>& body = bodies[i];
-            Vector<T> avg_acceleration = (accelerations[i] + new_accelerations[i]) * T{0.5};
-            body.set_velocity(body.velocity() + avg_acceleration * this->dt_);
+            body.set_velocity(body.velocity() + next_accelerations[i] * (this->dt_ * T{0.5}));
+        }
+        
+        auto* two_body_system = dynamic_cast<TwoBodySystem<T>*>(this->system_);
+        if (two_body_system) {
+            two_body_system->update_time(this->dt_);
         }
         
         return true;
@@ -76,7 +83,7 @@ private:
         return accelerations;
     }
     
-    T g_ = T{1.0}; // Гравитационная постоянная G
+    T g_ = T{1.0};
 };
 
 } // namespace nbody 
