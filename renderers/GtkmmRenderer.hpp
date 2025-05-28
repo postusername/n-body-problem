@@ -12,9 +12,11 @@
 
 #include "renderers/CairoRenderer.hpp"
 #include "renderers/GraphWidget.hpp"
+#include "renderers/GridVisualizationWidget.hpp"
 #include "renderers/RenderDialog.hpp"
 #include "renderers/Renderer.hpp"
 #include "simulators/Simulator.hpp"
+#include "simulators/ParticleMeshSimulator.hpp"
 
 #include <gtkmm.h>
 
@@ -398,6 +400,55 @@ public:
             sigc::mem_fun(*this, &GtkmmRenderer::on_render_clicked));
         m_control_box->append(*m_render_button);
         
+        // Инициализация виджетов для PM симулятора
+        m_grid_visualization_widget = std::make_unique<GridVisualizationWidget>();
+        m_grid_visualization_widget->set_size_request(512, 512);
+        
+        m_grid_control_box = std::make_unique<Gtk::Box>(Gtk::Orientation::HORIZONTAL, 5);
+        m_grid_control_box->set_margin(5);
+        
+        auto data_type_label = std::make_unique<Gtk::Label>("Тип данных:");
+        m_grid_control_box->append(*data_type_label);
+        
+        auto data_type_combo = std::make_unique<Gtk::ComboBoxText>();
+        data_type_combo->append("density", "Плотность");
+        data_type_combo->append("potential", "Потенциал");
+        data_type_combo->append("fft_in", "FFT вход");
+        data_type_combo->append("fft_out", "FFT выход (модуль)");
+        data_type_combo->set_active_id("density");
+        data_type_combo->signal_changed().connect([this, combo_ptr = data_type_combo.get()]() {
+            auto active_id = combo_ptr->get_active_id();
+            if (active_id == "density") {
+                m_grid_visualization_widget->set_data_type(GridVisualizationWidget::DataType::DENSITY);
+            } else if (active_id == "potential") {
+                m_grid_visualization_widget->set_data_type(GridVisualizationWidget::DataType::POTENTIAL);
+            } else if (active_id == "fft_in") {
+                m_grid_visualization_widget->set_data_type(GridVisualizationWidget::DataType::FFT_IN);
+            } else if (active_id == "fft_out") {
+                m_grid_visualization_widget->set_data_type(GridVisualizationWidget::DataType::FFT_OUT_MAGNITUDE);
+            }
+        });
+        m_grid_control_box->append(*data_type_combo);
+        
+        auto slice_label = std::make_unique<Gtk::Label>("Слой Z:");
+        m_grid_control_box->append(*slice_label);
+        
+        auto slice_scale = std::make_unique<Gtk::Scale>(Gtk::Orientation::HORIZONTAL);
+        slice_scale->set_range(0, 31); // Будет обновлено при получении данных
+        slice_scale->set_value(0);
+        slice_scale->set_size_request(200, -1);
+        slice_scale->signal_value_changed().connect([this, scale_ptr = slice_scale.get()]() {
+            int slice = static_cast<int>(scale_ptr->get_value());
+            m_grid_visualization_widget->set_slice_z(slice);
+        });
+        m_grid_control_box->append(*slice_scale);
+        
+        // Сохраняем ссылки на элементы управления для обновления диапазонов
+        m_data_type_combo = std::move(data_type_combo);
+        m_slice_scale = std::move(slice_scale);
+        m_data_type_label = std::move(data_type_label);
+        m_slice_label = std::move(slice_label);
+        
         return true;
     }
     
@@ -412,6 +463,11 @@ public:
         
         if (m_graph_widget) {
             m_graph_widget->add_point(system.graph_value());
+        }
+
+        // Обновляем данные PM симулятора если применимо
+        if (this->simulator_) {
+            update_pm_data(this->simulator_);
         }
 
         if (!m_first_frame_rendered && m_loading_label) {
@@ -445,6 +501,39 @@ public:
     Gtk::Widget* get_drawing_area() { return m_drawing_area.get(); }
     Gtk::Widget* get_control_box() { return m_control_box.get(); }
     Gtk::Widget* get_graph_widget() { return m_graph_widget.get(); }
+    
+    // Методы для получения виджетов визуализации сетки PM симулятора
+    Gtk::Widget* get_grid_visualization_widget() { return m_grid_visualization_widget.get(); }
+    Gtk::Widget* get_grid_control_box() { return m_grid_control_box.get(); }
+    
+    void update_pm_data(Simulator<T>* simulator) {
+        auto pm_sim = dynamic_cast<nbody::ParticleMeshSimulator<T>*>(simulator);
+        if (!pm_sim || !m_grid_visualization_widget) return;
+        
+        int grid_size = pm_sim->get_grid_size();
+        
+        // Обновляем диапазон слайдера для выбора слоя
+        if (m_slice_scale) {
+            m_slice_scale->set_range(0, grid_size - 1);
+        }
+        
+        // Обновляем данные плотности
+        auto density_data = pm_sim->get_density_grid();
+        std::vector<double> density_double(density_data.begin(), density_data.end());
+        m_grid_visualization_widget->set_density_data(density_double, grid_size);
+        
+        // Обновляем данные потенциала
+        auto potential_data = pm_sim->get_potential_grid();
+        std::vector<double> potential_double(potential_data.begin(), potential_data.end());
+        m_grid_visualization_widget->set_potential_data(potential_double, grid_size);
+        
+        // Обновляем FFT данные
+        auto fft_in_data = pm_sim->get_fft_in_data();
+        m_grid_visualization_widget->set_fft_in_data(fft_in_data, grid_size);
+        
+        auto fft_out_data = pm_sim->get_fft_out_data();
+        m_grid_visualization_widget->set_fft_out_data(fft_out_data, grid_size);
+    }
     
     void set_should_close(bool value) {
         m_should_close = value;
@@ -639,6 +728,16 @@ private:
     bool m_paused = false;
     
     std::unique_ptr<RenderDialog> m_render_dialog;
+    
+    // Виджеты для визуализации сетки PM симулятора
+    std::unique_ptr<GridVisualizationWidget> m_grid_visualization_widget;
+    std::unique_ptr<Gtk::Box> m_grid_control_box;
+    
+    // Элементы управления для PM симулятора
+    std::unique_ptr<Gtk::ComboBoxText> m_data_type_combo;
+    std::unique_ptr<Gtk::Scale> m_slice_scale;
+    std::unique_ptr<Gtk::Label> m_data_type_label;
+    std::unique_ptr<Gtk::Label> m_slice_label;
 };
 
 } // namespace nbody 

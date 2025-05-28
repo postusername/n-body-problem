@@ -14,7 +14,7 @@
 На данный момент протестирован билд только под Ubuntu-alike ОС. Для остальных систем следует установить зависимости, указанные в CMake.
 ```bash
 sudo apt update
-sudo apt install make cmake clang pkg-config libgtkmm-4.0-dev libsigc++-3.0-dev libgtk-4-dev libglibmm-2.68-dev libcairomm-1.16-dev libpangomm-2.48-dev libglib2.0-dev libpango-1.0-0 libcairo2-dev libgdk-pixbuf-2.0-0 gir1.2-graphene-1.0 ffmpeg libavformat-dev libavcodec-dev libavutil-dev libswscale-dev
+sudo apt install make cmake clang pkg-config libgtkmm-4.0-dev libsigc++-3.0-dev libgtk-4-dev libglibmm-2.68-dev libcairomm-1.16-dev libpangomm-2.48-dev libglib2.0-dev libpango-1.0-0 libcairo2-dev libgdk-pixbuf-2.0-0 gir1.2-graphene-1.0 ffmpeg libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libfftw3-bin libfftw3-dev
 git clone https://github.com/postusername/n-body-problem
 cd n-body-problem
 mkdir -p build

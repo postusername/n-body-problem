@@ -12,7 +12,7 @@ class NewtonianSimulator : public Simulator<T> {
 public:
     NewtonianSimulator() = default;
 
-    void set_g(T g) {
+    void set_g(T g) override {
         g_ = g;
     }
     
@@ -83,7 +83,7 @@ private:
         return accelerations;
     }
     
-    T g_ = T{1.0};
+    T g_ = T{1};
 };
 
 } // namespace nbody 

@@ -28,7 +28,7 @@ public:
     void generate() override {
         this->clear();
         
-        const T G = T{1.};
+        const T G = T{6.67430e-11};
         const T M_SUN = T{1.989e30};
         const T AU = T{1.496e11};
         const T PI = T{3.14159265358979323846};
@@ -212,7 +212,7 @@ private:
     
 private:
     T estimate_mass(T gm, T diameter, bool is_kuiper) {
-        const T G = T{1.};
+        const T G = T{6.67430e-11};
         const T PI = T{3.14159265358979323846};
         
         if (gm > T{0}) {
@@ -227,7 +227,7 @@ private:
     }
 
     void add_asteroid_body(const std::string& name, T mass, T a, T e, T i_deg, T omega_deg, T Omega_deg, T ma_deg) {
-        const T G = T{1.};
+        const T G = T{6.67430e-11};
         const T M_SUN = T{1.989e30};
         const T AU = T{1.496e11};
         const T PI = T{3.14159265358979323846};
@@ -346,7 +346,7 @@ private:
     }
     
     T compute_total_energy() const {
-        const T G = T{1};
+        const T G = T{6.67430e-11};
         T kinetic = T{0};
         T potential = T{0};
 

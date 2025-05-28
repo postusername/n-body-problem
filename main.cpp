@@ -9,6 +9,7 @@
 #include "renderers/GtkmmRenderer.hpp"
 #include "renderers/RenderEngine.hpp"
 #include "simulators/NewtonianSimulator.hpp"
+#include "simulators/ParticleMeshSimulator.hpp"
 #include "systems/CircleSystem.hpp"
 #include "systems/SolarSystem.hpp"
 #include "systems/ThreeBodySystem.hpp"
@@ -21,13 +22,13 @@
 
 class SimulationApp {
 public:
-    SimulationApp() : running(true), cli_dt_value(1e-5) {}
+    SimulationApp() : running(true), cli_dt_value(1e-5), simulator_type("pm") {} //!
     
     int run(int argc, char* argv[]) {
         try {
             std::cout << "INFO: Инициализация GTK..." << std::endl;
             
-            app = Gtk::Application::create("org.nbody.simulation");
+            app = Gtk::Application::create("org.nbody.simulation2");            //!
             set_cli_options();
             
             app->signal_handle_local_options().connect(
@@ -43,41 +44,6 @@ public:
                 std::cerr << "ERROR: Начальное состояние системы некорректно" << std::endl;
                 return 1;
             }
-            
-            simulator.set_system(&system);
-            
-            if (!renderer.initialize(&simulator)) {
-                std::cerr << "ERROR: Не удалось инициализировать рендерер" << std::endl;
-                return 1;
-            }
-            
-            window = std::make_unique<Gtk::Window>();
-            window->set_title("N-Body Simulation");
-            window->set_default_size(1280, 720);
-            window->signal_close_request().connect(sigc::mem_fun(*this, &SimulationApp::on_window_close), false);
-            
-            notebook = std::make_unique<Gtk::Notebook>();
-            
-            main_box = std::make_unique<Gtk::Box>(Gtk::Orientation::VERTICAL, 5);
-            main_box->append(*renderer.get_drawing_area());
-            main_box->append(*renderer.get_control_box());
-            
-            graph_box = std::make_unique<Gtk::Box>(Gtk::Orientation::VERTICAL, 5);
-            graph_box->append(*renderer.get_graph_widget());
-            
-            auto graph_controls = std::make_unique<Gtk::Box>(Gtk::Orientation::HORIZONTAL, 5);
-            auto reset_graph_button = std::make_unique<Gtk::Button>("Сбросить вид графика");
-            reset_graph_button->signal_clicked().connect([this]() {
-                static_cast<nbody::GraphWidget<DoubleDouble>*>(renderer.get_graph_widget())->reset_view();
-            });
-            graph_controls->append(*reset_graph_button);
-            graph_controls->set_margin(5);
-            graph_box->append(*graph_controls);
-            
-            notebook->append_page(*main_box, "Симуляция");
-            notebook->append_page(*graph_box, "График");
-            
-            window->set_child(*notebook);
             
             std::cout << "INFO: Запуск главного цикла GTK..." << std::endl;
             
@@ -103,8 +69,19 @@ private:
         dt_entry.set_description("Timestep for simulation (default = 1e-5)");
         dt_entry.set_arg_description("TIMESTEP");
         
+        Glib::OptionEntry simulator_entry;
+        simulator_entry.set_long_name("simulator");
+        simulator_entry.set_description("Simulator type: newtonian or pm (particle-mesh)");
+        simulator_entry.set_arg_description("TYPE");
+        
         Glib::OptionGroup* group = new Glib::OptionGroup("nbody", "N-Body Simulation Options");
         group->add_entry(dt_entry, cli_dt_value);
+        group->add_entry(simulator_entry, [this](const Glib::ustring& option_name, const Glib::ustring& value, bool has_value) -> bool {
+            if (has_value) {
+                simulator_type = std::string(value);
+            }
+            return true;
+        });
         
         app->add_option_group(*group);
     }
@@ -114,14 +91,84 @@ private:
     }
     
     void on_activate() {
+        std::cout << "INFO: Создание симулятора типа: " << simulator_type << std::endl;
+        if (simulator_type == "pm" || simulator_type == "particle-mesh") {
+            int grid_size = 256;
+            if (std::is_same_v<decltype(system), nbody::SolarSystem<double>>) {
+                grid_size = 64;
+            }
+            simulator = std::make_unique<nbody::ParticleMeshSimulator<double>>(grid_size);
+        } else {
+            simulator = std::make_unique<nbody::NewtonianSimulator<double>>();
+        }
+        simulator->set_system(&system);
+
+        double g_value;
+        if (std::is_same_v<decltype(system), nbody::SolarSystem<double>>) {
+            g_value = double{6.67430e-11};
+        } else {
+            g_value = double{1};
+        }
+        std::cout << "INFO: G value: " << g_value << std::endl;
+        simulator->set_g(g_value);
+        simulator->set_dt(cli_dt_value);
+
+        if (!renderer.initialize(simulator.get())) {
+            std::cerr << "ERROR: Не удалось инициализировать рендерер" << std::endl;
+            app->quit();
+            return;
+        }
+        
+        window = std::make_unique<Gtk::Window>();
+        window->set_title("N-Body Simulation");
+        window->set_default_size(1280, 720);
+        window->signal_close_request().connect(sigc::mem_fun(*this, &SimulationApp::on_window_close), false);
+        
+        notebook = std::make_unique<Gtk::Notebook>();
+        
+        main_box = std::make_unique<Gtk::Box>(Gtk::Orientation::VERTICAL, 5);
+        main_box->append(*renderer.get_drawing_area());
+        main_box->append(*renderer.get_control_box());
+        
+        graph_box = std::make_unique<Gtk::Box>(Gtk::Orientation::VERTICAL, 5);
+        graph_box->append(*renderer.get_graph_widget());
+        
+        auto graph_controls = std::make_unique<Gtk::Box>(Gtk::Orientation::HORIZONTAL, 5);
+        auto reset_graph_button = std::make_unique<Gtk::Button>("Сбросить вид графика");
+        reset_graph_button->signal_clicked().connect([this]() {
+            static_cast<nbody::GraphWidget<double>*>(renderer.get_graph_widget())->reset_view();
+        });
+        graph_controls->append(*reset_graph_button);
+        graph_controls->set_margin(5);
+        graph_box->append(*graph_controls);
+        
+        notebook->append_page(*main_box, "Симуляция");
+        notebook->append_page(*graph_box, "График");
+        
+        // Добавляем вкладки для PM симулятора
+        if (simulator_type == "pm" || simulator_type == "particle-mesh") {
+            auto grid_viz_widget = renderer.get_grid_visualization_widget();
+            auto grid_control_widget = renderer.get_grid_control_box();
+            
+            if (grid_viz_widget && grid_control_widget) {
+                auto grid_box = std::make_unique<Gtk::Box>(Gtk::Orientation::VERTICAL, 5);
+                grid_box->append(*grid_viz_widget);
+                grid_box->append(*grid_control_widget);
+                
+                notebook->append_page(*grid_box, "Сетка PM");
+                
+                // Сохраняем ссылку на grid_box чтобы она не была удалена
+                grid_viz_box = std::move(grid_box);
+            }
+        }
+        
+        window->set_child(*notebook);
+        
         if (!window) {
             std::cerr << "ERROR: Окно не было создано перед активацией приложения" << std::endl;
             app->quit();
             return;
         }
-        
-        simulator.set_dt(cli_dt_value);
-        simulator.set_g(1);
 
         window->set_application(app);
         window->present();
@@ -149,14 +196,14 @@ private:
     }
     
     void simulation_loop() {
-        const int steps_per_frame = simulator.steps_per_frame();
+        const int steps_per_frame = simulator->steps_per_frame();
         
         while (running) {
             auto frame_start = std::chrono::steady_clock::now();
             
             if (!renderer.is_paused()) {
                 for (int i = 0; i < steps_per_frame && running; ++i) {
-                    if (!simulator.step()) {
+                    if (!simulator->step()) {
                         std::cerr << "ERROR: Ошибка в шаге симуляции" << std::endl;
                         running = false;
                         break;
@@ -185,8 +232,9 @@ private:
                 running = false;
                 break;
             }
-            
-            std::this_thread::sleep_for(std::chrono::milliseconds(17) - (std::chrono::steady_clock::now() - frame_start));
+            auto render_time = std::chrono::steady_clock::now() - frame_start;
+            if (!renderer.is_paused()) std::cout << "INFO: Время рендера шага: " << std::chrono::duration_cast<std::chrono::milliseconds>(render_time).count() << " мс" << std::endl;
+            std::this_thread::sleep_for(std::chrono::milliseconds(17) - render_time);
         }
     }
     
@@ -198,6 +246,7 @@ private:
         window.reset();
         main_box.reset();
         graph_box.reset();
+        grid_viz_box.reset();
         notebook.reset();
         
         std::cout << "INFO: Программа завершена успешно" << std::endl;
@@ -217,8 +266,8 @@ private:
             window.reset();
         }
 
-        nbody::RenderEngine<DoubleDouble> render_engine(settings, width, height);
-        bool success = render_engine.execute(system, simulator, renderer);
+        nbody::RenderEngine<double> render_engine(settings, width, height);
+        bool success = render_engine.execute(system, *simulator, renderer);
         
         if (success) {
             std::cout << "INFO: Рендер завершен успешно" << std::endl;
@@ -249,9 +298,11 @@ private:
     std::thread simulation_thread;
     double cli_dt_value;
     
-    nbody::SolarSystem<DoubleDouble> system;
-    nbody::NewtonianSimulator<DoubleDouble> simulator;
-    nbody::GtkmmRenderer<DoubleDouble> renderer;
+    nbody::ThreeBodySystem<double> system;
+    std::unique_ptr<nbody::Simulator<double>> simulator;
+    nbody::GtkmmRenderer<double> renderer;
+    std::string simulator_type;
+    std::unique_ptr<Gtk::Box> grid_viz_box;
 };
 
 int main(int argc, char* argv[]) {

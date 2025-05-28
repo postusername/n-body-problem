@@ -34,6 +34,7 @@ pkg_check_modules(FFMPEG REQUIRED
     libavutil
     libswscale
 )
+pkg_check_modules(FFTW3 REQUIRED fftw3)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${GTKMM_INCLUDE_DIRS})
@@ -41,12 +42,14 @@ include_directories(${SIGCPP_INCLUDE_DIRS})
 include_directories(${GTK_INCLUDE_DIRS})
 include_directories(${GLIBMM_INCLUDE_DIRS})
 include_directories(${FFMPEG_INCLUDE_DIRS})
+include_directories(${FFTW3_INCLUDE_DIRS})
 
 link_directories(${GTKMM_LIBRARY_DIRS})
 link_directories(${FFMPEG_LIBRARY_DIRS})
+link_directories(${FFTW3_LIBRARY_DIRS})
 
 add_executable(n_body_sim ${SOURCES})
-target_link_libraries(n_body_sim ${GTKMM_LIBRARIES} ${FFMPEG_LIBRARIES})
+target_link_libraries(n_body_sim ${GTKMM_LIBRARIES} ${FFMPEG_LIBRARIES} ${FFTW3_LIBRARIES})
 
 add_custom_command(TARGET n_body_sim POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory

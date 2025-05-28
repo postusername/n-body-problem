@@ -17,8 +17,8 @@ public:
     void generate() override {
         this->clear();
         
-        const T mass = T{1.0};
-        const T G = T{1.0};
+        const T mass = T{1};
+        const T G = T{1};
         
         T orbit_velocity = sqrt(G * mass * T{num_bodies_} / (3.625 * radius_));
         
@@ -72,7 +72,7 @@ public:
 
     T graph_value() const override {
         T total_energy = T{0};
-        const T G = T{1.0};
+        const T G = T{1};
         
         for (size_t i = 0; i < this->bodies().size(); ++i) {
             const auto& body_i = this->bodies()[i];
@@ -93,7 +93,7 @@ public:
     }
     
 private:
-    T num_bodies_ = 5;  // Количество тел
+    T num_bodies_ = 100;  // Количество тел
     T radius_ = T{1.0}; // Радиус кольца
 };
 

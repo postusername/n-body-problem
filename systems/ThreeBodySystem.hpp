@@ -16,8 +16,9 @@ public:
     void generate() override {
         this->clear();
 
-        // Chenciner, A., & Montgomery, R. (2000)
+        // Chenciner A., Montgomery R. (2000)
         // "A remarkable periodic solution of the three-body problem in the case of equal masses"
+        // https://arxiv.org/abs/math/0011268
         
         const T mass = T{1.0};
         
@@ -53,7 +54,7 @@ public:
             center_of_mass = center_of_mass / total_mass;
         }
         
-        const T epsilon = T{1e-4};
+        const T epsilon = T{1e-1};
         
         // суммарный импульс близок к нулю
         if (total_momentum.magnitude() > epsilon) {
